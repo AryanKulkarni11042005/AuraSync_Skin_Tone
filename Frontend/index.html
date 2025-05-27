@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AuraSync - Fashion Profile Analysis</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="email"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .results-container {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .face-result {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: white;
+        }
+        .color-swatch {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>AuraSync - Fashion Profile Analysis</h1>
+    
+    <form id="userForm">
+        <div class="form-group">
+            <label for="nameInput">Name:</label>
+            <input type="text" id="nameInput" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="emailInput">Email:</label>
+            <input type="email" id="emailInput" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="bodyShapeSelect">Body Shape:</label>
+            <select id="bodyShapeSelect">
+                <option value="">-- Select Body Shape --</option>
+                <option value="rectangle">Rectangle</option>
+                <option value="hourglass">Hourglass</option>
+                <option value="pear">Pear</option>
+                <option value="apple">Apple</option>
+                <option value="inverted-triangle">Inverted Triangle</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="personalitySelect">Fashion Personality:</label>
+            <select id="personalitySelect">
+                <option value="">-- Select Personality Type --</option>
+                <option value="classic">Classic</option>
+                <option value="romantic">Romantic</option>
+                <option value="dramatic">Dramatic</option>
+                <option value="natural">Natural</option>
+                <option value="creative">Creative</option>
+                <option value="elegant">Elegant</option>
+                <option value="casual">Casual</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="imageInput">Upload Your Photo for Skin Tone Analysis:</label>
+            <input type="file" id="imageInput" accept="image/*" required>
+        </div>
+        
+        <button type="submit">Analyze & Save Profile</button>
+    </form>
+    
+    <div id="results" class="results-container hidden"></div>
+
+    <script>
+        document.getElementById('userForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const nameInput = document.getElementById('nameInput');
+            const emailInput = document.getElementById('emailInput');
+            const bodyShapeSelect = document.getElementById('bodyShapeSelect');
+            const personalitySelect = document.getElementById('personalitySelect');
+            const fileInput = document.getElementById('imageInput');
+            const resultsDiv = document.getElementById('results');
+            
+            // Basic validation
+            if (!nameInput.value || !emailInput.value || !fileInput.files[0]) {
+                resultsDiv.innerHTML = '<p class="error">Please fill all required fields and select an image</p>';
+                resultsDiv.classList.remove('hidden');
+                return;
+            }
+            
+            // Prepare data for image analysis
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+            
+            // Show loading message
+            resultsDiv.innerHTML = '<p>Analyzing image...</p>';
+            resultsDiv.classList.remove('hidden');
+            
+            try {
+                // Step 1: Analyze the skin tone
+                const response = await fetch('http://localhost:3000/analyze-skin-tone', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultsDiv.innerHTML = `<p class="error">Error: ${data.error}</p>`;
+                    return;
+                }
+                
+                let resultHTML = '<h2>Analysis Results:</h2>';
+                let skinTone = '';
+                let undertone = '';
+                
+                if (data.faces && data.faces.length > 0) {
+                    // Use data from the first face
+                    const faceData = data.faces[0];
+                    skinTone = faceData.skin_tone;
+                    undertone = faceData.undertone;
+                    
+                    // Display results for all detected faces
+                    data.faces.forEach(face => {
+                        resultHTML += `
+                            <div class="face-result">
+                                <h3>Face ${face.face_id}</h3>
+                                <p>Skin Tone: ${face.skin_tone}</p>
+                                <p>Dominant Color: ${face.dominant_color}</p>
+                                <p>Undertone: <strong>${face.undertone}</strong></p>
+                                <p>Accuracy: ${face.accuracy}%</p>
+                                <div class="color-swatch" style="background-color: ${face.dominant_color};"></div>
+                            </div>
+                        `;
+                    });
+                    
+                    // Step 2: Create or update user profile with all collected data
+                    const userData = {
+                        name: nameInput.value,
+                        email: emailInput.value,
+                        fashion_data: {
+                            skin_tone: skinTone,
+                            undertone: undertone,
+                            body_shape: bodyShapeSelect.value || undefined,
+                            personality_type: personalitySelect.value || undefined
+                        }
+                    };
+                    
+                    // Send user data to backend
+                    resultHTML += '<p>Saving your fashion profile...</p>';
+                    resultsDiv.innerHTML = resultHTML;
+                    
+                    // Create user profile
+                    const userResponse = await fetch('http://localhost:3000/api/users', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(userData)
+                    });
+                    
+                    const userResult = await userResponse.json();
+                    
+                    if (userResult.error) {
+                        resultHTML += `<p class="error">Error saving profile: ${userResult.error}</p>`;
+                    } else {
+                        resultHTML += `
+                            <div class="face-result">
+                                <h3>Fashion Profile Saved!</h3>
+                                <p>Name: ${userResult.name}</p>
+                                <p>Email: ${userResult.email}</p>
+                                <p>Skin Tone: ${userResult.fashion_data?.skin_tone || 'Not determined'}</p>
+                                <p>Undertone: ${userResult.fashion_data?.undertone || 'Not determined'}</p>
+                                <p>Body Shape: ${userResult.fashion_data?.body_shape || 'Not specified'}</p>
+                                <p>Fashion Personality: ${userResult.fashion_data?.personality_type || 'Not specified'}</p>
+                                <p>User ID (for reference): ${userResult._id}</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    resultHTML += '<p class="error">No faces detected in the image. Please try with a clearer photo.</p>';
+                }
+                
+                resultsDiv.innerHTML = resultHTML;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML = `<p class="error">Error: ${error.message || 'Something went wrong'}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
